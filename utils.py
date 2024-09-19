@@ -3,6 +3,7 @@ import pandas as pd
 import tensorflow as tf
 from stable_baselines3.common.callbacks import BaseCallback
 import os
+from stable_baselines3.common.results_plotter import load_results, ts2xy, plot_results
 
 #############################################
 #### HILFSFUNKTIONEN FÜR DIE MUSTERGENERIERUNG
