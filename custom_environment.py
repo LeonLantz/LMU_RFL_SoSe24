@@ -10,6 +10,9 @@ from os import path
 DEFAULT_X = np.pi
 DEFAULT_Y = 1.0
 
+output_min = [-1, -1, -8]
+output_max = [1, 1, 8]
+
 class Pendulum_Custom_Environment(gym.Env):
     
     steps = 0
@@ -77,9 +80,8 @@ class Pendulum_Custom_Environment(gym.Env):
         # NN recall
         netOutput = self.model.predict(np.float64(state), verbose=0)[0]
 
-                
-        # retrieve new state
-        #self.state = np.float64([netOutput[0], netOutput[1], netOutput[2]])
+        # Begrenzung der Ausgabe auf begrenzenden Datenbereich
+        netOutput = np.clip(netOutput, output_min, output_max)
 
         newth = np.arctan2(netOutput[1], netOutput[0])  # angle from sin, cos
         newthdot = netOutput[2]

@@ -11,6 +11,9 @@ import pandas as pd
 DEFAULT_X = np.pi
 DEFAULT_Y = 1.0
 
+output_min = [-1, -1, -8]
+output_max = [1, 1, 8]
+
 class Pendulum_Custom_Environment_DensityAdjustedReward(gym.Env):
     
     steps = 0
@@ -21,11 +24,12 @@ class Pendulum_Custom_Environment_DensityAdjustedReward(gym.Env):
         "render_fps": 30,
     }
 
-    def __init__(self, kde, render_mode: Optional[str] = None, g=10.0, model_filename="model.keras", window_size=4, reward_function_id = 0):
+    def __init__(self, kde, render_mode: Optional[str] = None, g=10.0, model_filename="model.keras", window_size=4, reward_function_id = 0, initial_state=0):
         self.model = tf.keras.models.load_model(model_filename, compile=False)
         self.window_size = window_size
 
         self.reward_function_id = reward_function_id
+        self.initial_state = initial_state
         self.kde = kde
         # FIFO-buffer to store state history
         self.stateBuffer = collections.deque(maxlen=window_size)
@@ -95,7 +99,7 @@ class Pendulum_Custom_Environment_DensityAdjustedReward(gym.Env):
                 # diese reward funktion soll States mit einer Dichte < x generell mit kosten von 2 bestrafen
                 # Werte darüber werden nicht bestraft
                 if(state_density < 0.01):
-                    costs = angle_normalize(th) ** 2 + 0.1 * thdot**2 + 0.001 * (u**2) + 2
+                    costs = angle_normalize(th) ** 2 + 0.1 * thdot**2 + 0.001 * (u**2) + 30
                 else: 
                     costs = angle_normalize(th) ** 2 + 0.1 * thdot**2 + 0.001 * (u**2)
             ####Density Adjusted Reward 3
@@ -121,6 +125,8 @@ class Pendulum_Custom_Environment_DensityAdjustedReward(gym.Env):
         # NN recall
         netOutput = self.model.predict(np.float64(state), verbose=0)[0]
 
+        # Begrenzung der Ausgabe auf begrenzenden Datenbereich
+        netOutput = np.clip(netOutput, output_min, output_max)
                 
         # retrieve new state
         #self.state = np.float64([netOutput[0], netOutput[1], netOutput[2]])
@@ -157,8 +163,32 @@ class Pendulum_Custom_Environment_DensityAdjustedReward(gym.Env):
             x = utils.verify_number_and_cast(x)
             y = utils.verify_number_and_cast(y)
             high = np.array([x, y])
+
         low = -high  # We enforce symmetric limits.
         self.state = self.np_random.uniform(low=low, high=high)
+        
+        if(self.initial_state == 1):
+            # Theta soll im unteren Bereich starten (theta < -2pi/3 oder theta > 2pi/3)
+            # Wir definieren einen Bereich um die untere Position herum
+            lower_bound_theta = 2 * np.pi / 3
+            upper_bound_theta = -2 * np.pi / 3
+
+            # Randomly choose theta in the lower section: either < -2pi/3 or > 2pi/3
+            if np.random.rand() > 0.5:
+                theta = np.random.uniform(lower_bound_theta, np.pi)
+            else:
+                theta = np.random.uniform(-np.pi, upper_bound_theta)
+
+            thetadot = np.random.uniform(-1, 1)  # Initial angular velocity (you can adjust this range)
+            self.state = np.array([theta, thetadot])
+
+        if(self.initial_state == 2):
+            # Starte immer ganz unten in Ruhe
+            thetadot = 0
+            theta = np.pi
+            self.state = np.array([theta, thetadot])
+
+
         self.last_u = None
 
         self.steps = 0
